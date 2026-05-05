@@ -1,161 +1,202 @@
-# 🚀 JobPilot AI — Smart Job Application System
+# JobPilot AI — Smart Job Application System
 
-An AI-powered web app that automates your job search and application process using Claude AI.
+An AI-powered web app that searches jobs from LinkedIn, Indeed, Glassdoor and more, then tailors your resume and generates cover letters for each application.
 
-## ✨ Features
-
-| Feature | Description |
-|---------|-------------|
-| 📄 Multi-resume support | Upload PDF & DOCX resumes; switch between versions |
-| 🔍 Job search | Search Adzuna + JSearch (RapidAPI) simultaneously |
-| 🤖 AI match analysis | Claude scores your resume against each job (0–100%) |
-| ✏️ Resume tailoring | AI rewrites resume to highlight relevant skills/experience |
-| 📝 Cover letter gen | Personalized cover letter for each application |
-| 📊 Excel tracker | Auto-tracks every application with status, score, salary |
-| 🔗 Semi-auto apply | Downloads tailored docs + opens job URL for you to submit |
+**Live app:** https://jobpilot-latest.onrender.com
 
 ---
 
-## 🚀 Quick Start
+## Features
 
-### 1. Install dependencies
+| Feature | Description |
+|---|---|
+| Job search | Pulls from Google Jobs (LinkedIn/Indeed/Glassdoor), JSearch, The Muse, RemoteOK |
+| AI match scoring | Scores your resume against each job (0–100%) |
+| Resume tailoring | Rewrites your resume to target the specific role |
+| Cover letter | Personalized cover letter per application |
+| Application tracker | Auto-tracks every application in an Excel file |
+
+---
+
+## Local Development
+
+### Prerequisites
+
+- Python 3.11+
+- [Ollama](https://ollama.com) installed (for local LLM — you already have this)
+
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/utsav3/jobpilot.git
 cd jobpilot
 pip install -r requirements.txt
 ```
 
-### 2. Set up API keys
+### 2. Pull the model into Ollama
 
-**Option A — .env file (recommended):**
+Only needed the first time:
+
+```bash
+ollama pull llama3.1
+```
+
+### 3. Start Ollama
+
+Ollama must be running before you launch the app:
+
+```bash
+ollama serve
+```
+
+Leave this terminal open. You should see:
+```
+Listening on 127.0.0.1:11434
+```
+
+### 4. Set up your API keys
+
 ```bash
 cp .env.example .env
-# Edit .env and fill in your keys
 ```
-Then load it before running:
-```bash
-# macOS/Linux
-export $(cat .env | xargs) && streamlit run app.py
 
-# Windows PowerShell
-Get-Content .env | ForEach-Object { if ($_ -match '^([^#][^=]*)=(.*)$') { [System.Environment]::SetEnvironmentVariable($matches[1].Trim(), $matches[2].Trim()) } }
+Open `.env` and fill in any keys you want. The only required one for local dev is optional — the app works without job search API keys using The Muse and RemoteOK as free sources.
+
+```bash
+# .env
+ANTHROPIC_API_KEY=        # optional locally — Ollama is used instead
+SERPAPI_KEY=              # optional — Google Jobs (LinkedIn/Indeed/Glassdoor)
+RAPIDAPI_KEY=             # optional — JSearch
+ADZUNA_APP_ID=            # optional — Adzuna
+ADZUNA_API_KEY=           # optional — Adzuna
+```
+
+### 5. Run the app
+
+Open a second terminal (keep `ollama serve` running in the first):
+
+```bash
 streamlit run app.py
 ```
 
-**Option B — Enter keys in the app sidebar** (no file needed, keys last for the session).
+App opens at **http://localhost:8501**
 
-### 3. Run the app
+### How the LLM is chosen locally
 
-```bash
-streamlit run app.py
+The app auto-detects which LLM to use:
+
+```
+Local machine
+├── ANTHROPIC_API_KEY set in .env → uses Claude
+├── GOOGLE_API_KEY set in .env   → uses Gemini (free)
+├── OPENAI_API_KEY set in .env   → uses OpenAI
+└── No cloud key                 → uses Ollama llama3.1 at localhost:11434
 ```
 
-The app opens at **http://localhost:8501**
+The sidebar shows which one is active (💻 Local · Ollama llama3.1).
 
 ---
 
-## 🔑 API Keys Setup
+## Production Deployment (Render)
 
-### Anthropic API Key (Required)
-- Go to [console.anthropic.com](https://console.anthropic.com)
-- Create an account and generate an API key
-- Costs: ~$0.003–0.015 per resume tailoring + cover letter (Claude Sonnet)
+The app is deployed on [Render](https://render.com) at **https://jobpilot-latest.onrender.com**.
 
-### Adzuna API (Free — Recommended)
-- Register at [developer.adzuna.com](https://developer.adzuna.com)
-- Free tier: 250 requests/month
-- You get an **App ID** and **API Key**
+### How it deploys
 
-### JSearch via RapidAPI (Free tier available)
-- Sign up at [RapidAPI](https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch)
-- Subscribe to JSearch (free tier: 200 requests/month)
-- Copy your **RapidAPI Key** from the dashboard
+Render detects `render.yaml` in the repo and configures everything automatically:
+- **Build command:** `pip install -r requirements.txt`
+- **Start command:** `streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true`
 
-> **Note:** You need at least one job search API key. If you have both, results are combined and deduplicated.
+On Render, the `RENDER=true` environment variable is set automatically. The app detects this and never tries to reach Ollama — it requires a cloud LLM key instead.
 
----
+```
+Render (deployed)
+├── ANTHROPIC_API_KEY set → uses Claude   ← recommended
+├── GOOGLE_API_KEY set    → uses Gemini (free)
+├── OPENAI_API_KEY set    → uses OpenAI
+└── No key set            → shows error, AI tab blocked
+```
 
-## 📖 How to Use
+### Updating environment variables on Render
 
-### Step 1 — Upload Resumes
-1. Go to the **📄 Resumes** tab
-2. Upload one or more PDF/DOCX resumes
-3. Set one as "Active" (this is the base the AI will tailor)
+1. Go to [render.com](https://render.com) → your `jobpilot` service
+2. Click **Environment** in the left sidebar
+3. Add or edit a variable (e.g. `ANTHROPIC_API_KEY`)
+4. Click **Save Changes** — Render redeploys automatically (~2 min)
 
-### Step 2 — Search Jobs
-1. Go to the **🔍 Job Search** tab
-2. Enter keywords (e.g. "Software Engineer") and location
-3. Use filters for remote, salary range
-4. Click **+ Select** on jobs you want to apply to
+### Deploying a new version
 
-### Step 3 — AI Apply
-1. Go to the **🤖 AI Apply** tab
-2. Choose whether to generate cover letters
-3. Click **⚡ Process All Selected Jobs**
-4. For each job, the AI will:
-   - Score the match (0–100%)
-   - Identify matching and missing skills
-   - Tailor your resume
-   - Write a cover letter
-5. Download the tailored resume + cover letter
-6. Click "Open Job Posting" to apply manually
+Push to `main` and Render redeploys automatically:
 
-### Step 4 — Track Applications
-1. Go to the **📊 Tracker** tab
-2. View all applications with match scores, salary, status
-3. Filter and sort by status, company, date
-4. Download the full Excel tracker
+```bash
+git add .
+git commit -m "your change"
+git push origin main
+```
 
 ---
 
-## 📁 Project Structure
+## API Keys Reference
+
+### LLM (need at least one in production)
+
+| Key | Where to get it | Cost |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) | ~$1–5/month typical |
+| `GOOGLE_API_KEY` | [aistudio.google.com](https://aistudio.google.com) → Get API key | Free (1M tokens/day) |
+| `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) | ~$2–8/month typical |
+
+### Job Search (all optional — free sources work without any key)
+
+| Key | Where to get it | Free tier |
+|---|---|---|
+| `SERPAPI_KEY` | [serpapi.com](https://serpapi.com) | 100 searches/month |
+| `RAPIDAPI_KEY` | rapidapi.com → search "JSearch" | 200 requests/month |
+| `ADZUNA_APP_ID` + `ADZUNA_API_KEY` | [developer.adzuna.com](https://developer.adzuna.com) | 250 requests/month |
+
+> **Note:** LinkedIn, Indeed, and Glassdoor do not offer public APIs. The best way to get jobs from them is via SerpAPI (Google Jobs) or JSearch — both aggregate those platforms.
+
+---
+
+## Project Structure
 
 ```
 jobpilot/
-├── app.py                    # Main Streamlit app
+├── app.py                  # Streamlit UI (all tabs)
 ├── utils/
-│   ├── resume_parser.py      # PDF/DOCX text extraction
-│   ├── job_search.py         # Adzuna + JSearch APIs
-│   ├── ai_tailor.py          # Claude AI integration
-│   ├── excel_tracker.py      # Application tracking
-│   └── resume_writer.py      # Generate tailored DOCX files
+│   ├── ai_tailor.py        # LLM integration (Claude / Gemini / OpenAI / Ollama)
+│   ├── job_search.py       # Job search across all sources
+│   ├── resume_parser.py    # PDF/DOCX text extraction
+│   ├── resume_writer.py    # Generate tailored DOCX files
+│   └── excel_tracker.py    # Application tracking spreadsheet
+├── render.yaml             # Render deployment config
 ├── requirements.txt
 ├── .env.example
-└── README.md
+└── .gitignore
 ```
 
 ---
 
-## ⚠️ Important Notes
+## Troubleshooting
 
-- **Do not fabricate experience**: The AI is instructed to only use information from your actual resume. Always review before submitting.
-- **API costs**: Each job processed uses ~2–3 Claude API calls. At current Sonnet pricing, expect ~$0.01–0.05 per job.
-- **Job site ToS**: This tool searches official APIs and opens job URLs for you to submit manually. It does not scrape or auto-submit forms, respecting job site terms of service.
-- **Resume quality**: The better your original resume, the better the tailored output.
+**Ollama is not running error**
+```bash
+ollama serve   # start it, then refresh the app
+```
 
----
+**Model not found**
+```bash
+ollama pull llama3.1
+```
 
-## 🛠️ Troubleshooting
+**No jobs found**
+- Leave the city field blank to search the whole country
+- Try simpler keywords (e.g. "software engineer" not "senior python backend engineer NYC fintech")
+- Free sources (The Muse, RemoteOK) have limited listings — add a SerpAPI or RapidAPI key for much better coverage
 
-**No jobs found?**
-- Check your API keys are saved (click "Save Keys" in sidebar)
-- Try broader keywords or different location
-- Ensure at least one job search API key is set
+**AI tab blocked on Render**
+- No LLM key is set — go to Render dashboard → Environment → add `ANTHROPIC_API_KEY` or `GOOGLE_API_KEY`
 
-**AI processing fails?**
-- Verify your Anthropic API key has credits
-- Check the key is saved via the sidebar
-
-**DOCX won't open?**
-- Ensure Microsoft Word or LibreOffice is installed
-- Try re-downloading the file
-
----
-
-## 🔮 Future Improvements
-
-- [ ] LinkedIn Easy Apply integration
-- [ ] Indeed one-click apply
-- [ ] Email follow-up drafts
-- [ ] Interview prep Q&A per job
-- [ ] Application analytics dashboard
+**App slow on Render free tier**
+- Free tier sleeps after 15 min of inactivity and takes ~30 sec to wake up
+- Upgrade to Starter ($7/month) for always-on

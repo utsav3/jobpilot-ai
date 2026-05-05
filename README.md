@@ -2,7 +2,7 @@
 
 An AI-powered web app that searches jobs from LinkedIn, Indeed, Glassdoor and more, then tailors your resume and generates cover letters for each application.
 
-**Live app:** https://jobpilot-latest.onrender.com
+**Live app:** https://jobpilot-ai-0zy1.onrender.com
 
 ---
 

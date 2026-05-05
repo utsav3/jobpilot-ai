@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/opt/homebrew/bin/python3 -c \"from utils.job_search import search_jobs, get_active_sources; print\\('Import OK'\\); print\\('Active sources:', get_active_sources\\(\\)\\)\")"
+    ]
+  }
+}

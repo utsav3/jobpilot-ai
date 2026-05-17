@@ -60,9 +60,9 @@ def get_provider() -> str:
 
 def get_provider_label() -> str:
     labels = {
-        "claude": f"Claude ({os.getenv('CLAUDE_MODEL', 'claude-haiku-4-5-20251001')})",
-        "gemini": "Gemini 1.5 Flash (free)",
-        "openai": "OpenAI GPT-4o-mini",
+        "claude": f"Claude Sonnet",
+        "gemini": "Gemini 1.5 Flash",
+        "openai": "GPT-4o-mini",
         "ollama": "Ollama llama3.1 (local)",
         "none": "⚠️ No LLM configured",
     }
@@ -91,7 +91,7 @@ def _chat(prompt: str, max_tokens: int = 800) -> str:
 
 def _chat_claude(prompt: str, max_tokens: int) -> str:
     import anthropic
-    model = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
+    model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-5-20251001")
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     msg = client.messages.create(
         model=model,

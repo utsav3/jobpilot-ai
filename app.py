@@ -2,15 +2,12 @@
 JobPilot AI — Smart Job Application System
 Run: streamlit run app.py
 """
-import streamlit as st
 import os
 import tempfile
-import shutil
-import webbrowser
-from pathlib import Path
 from datetime import datetime
 
-# ── Page config ─────────────────────────────────────────────────────────────
+import streamlit as st
+
 st.set_page_config(
     page_title="JobPilot AI",
     page_icon="🚀",
@@ -18,70 +15,176 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── CSS ──────────────────────────────────────────────────────────────────────
+# ── Design system ─────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-.main-title {
-    font-size: 2.2rem; font-weight: 700;
-    background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    margin-bottom: 0;
+/* ── Brand colours ── */
+:root {
+  --primary:       #6366f1;
+  --primary-dark:  #4f46e5;
+  --primary-light: #eef2ff;
+  --success:       #10b981;
+  --success-light: #d1fae5;
+  --warning:       #f59e0b;
+  --warning-light: #fef3c7;
+  --danger:        #ef4444;
+  --danger-light:  #fee2e2;
+  --muted:         #64748b;
+  --border:        #e2e8f0;
+  --surface:       #f8fafc;
+  --card:          #ffffff;
 }
-.subtitle { color: #64748b; font-size: 1rem; margin-top: 0; }
 
-.job-card {
-    background: #ffffff; border-radius: 12px; padding: 1.1rem 1.3rem;
-    border: 1px solid #e2e8f0; margin-bottom: 0.8rem;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    transition: box-shadow 0.2s;
+/* ── Global tweaks ── */
+.block-container { padding-top: 1.5rem !important; }
+h1, h2, h3 { letter-spacing: -0.3px; }
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%) !important;
 }
-.job-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-
-.score-pill {
-    display: inline-block; padding: 2px 10px; border-radius: 20px;
-    font-size: 0.75rem; font-weight: 700; letter-spacing: 0.3px;
+[data-testid="stSidebar"] * { color: #e0e7ff !important; }
+[data-testid="stSidebar"] .stMetric label { color: #a5b4fc !important; }
+[data-testid="stSidebar"] .stMetric [data-testid="stMetricValue"] {
+    color: #ffffff !important; font-size: 1.4rem !important;
 }
-.score-high   { background: #dcfce7; color: #166534; }
-.score-medium { background: #fef9c3; color: #713f12; }
-.score-low    { background: #fee2e2; color: #991b1b; }
+[data-testid="stSidebar"] hr { border-color: #4338ca !important; opacity: 0.4; }
 
+/* Step rows in sidebar */
+.step-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0; font-size: 0.88rem;
+}
+.step-num {
+    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; font-weight: 700;
+    background: rgba(255,255,255,0.15); color: #c7d2fe;
+}
+.step-done .step-num { background: #10b981; color: white; }
+.step-active .step-num { background: #6366f1; color: white; }
+.step-label { line-height: 1.2; }
+.step-done .step-label { color: #a7f3d0 !important; }
+.step-active .step-label { color: #ffffff !important; font-weight: 600; }
+
+/* ── Hero banner (welcome screen) ── */
+.hero {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+    border-radius: 16px; padding: 2.5rem 2rem;
+    color: white; text-align: center; margin-bottom: 1.5rem;
+}
+.hero h1 { font-size: 2.2rem; font-weight: 700; margin: 0 0 0.4rem; color: white !important; }
+.hero p  { font-size: 1.05rem; opacity: 0.9; margin: 0 0 1.5rem; }
+.hero-pills { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 1rem; }
+.hero-pill {
+    background: rgba(255,255,255,0.2); backdrop-filter: blur(4px);
+    border-radius: 20px; padding: 5px 14px; font-size: 0.82rem; font-weight: 500;
+}
+
+/* ── Job cards ── */
+.jcard {
+    background: var(--card); border-radius: 12px;
+    border: 1.5px solid var(--border);
+    padding: 1rem 1.2rem; margin-bottom: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: box-shadow 0.15s, border-color 0.15s;
+}
+.jcard:hover { box-shadow: 0 4px 12px rgba(99,102,241,0.12); border-color: #c7d2fe; }
+.jcard.selected { border-color: var(--primary) !important; background: var(--primary-light); }
+
+.jcard-title { font-size: 0.98rem; font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+.jcard-company { font-size: 0.88rem; color: var(--muted); }
+.jcard-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; font-size: 0.78rem; color: var(--muted); }
+.jcard-meta span { display: flex; align-items: center; gap: 3px; }
+
+/* Source badges */
+.badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.2px;
+}
+.badge-linkedin  { background: #dbeafe; color: #1d4ed8; }
+.badge-indeed    { background: #fce7f3; color: #9d174d; }
+.badge-glassdoor { background: #d1fae5; color: #065f46; }
+.badge-google    { background: #fef3c7; color: #92400e; }
+.badge-muse      { background: #ede9fe; color: #5b21b6; }
+.badge-remoteok  { background: #f0fdf4; color: #14532d; }
+.badge-manual    { background: #f1f5f9; color: #475569; }
+.badge-default   { background: #f1f5f9; color: #475569; }
+
+/* Score ring */
+.score-ring {
+    width: 72px; height: 72px; border-radius: 50%; border: 5px solid;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 700; margin: 0 auto;
+}
+.ring-high   { border-color: var(--success); color: var(--success); }
+.ring-medium { border-color: var(--warning); color: var(--warning); }
+.ring-low    { border-color: var(--danger);  color: var(--danger);  }
+
+/* Skill chips */
+.chip {
+    display: inline-block; padding: 2px 9px; border-radius: 8px;
+    font-size: 0.73rem; margin: 2px; font-weight: 500;
+}
+.chip-good    { background: var(--success-light); color: #065f46; }
+.chip-missing { background: var(--warning-light); color: #78350f; }
+
+/* Stat boxes */
 .stat-box {
-    background: white; border-radius: 10px; padding: 1rem;
-    border: 1px solid #e2e8f0; text-align: center;
+    background: var(--card); border-radius: 10px; padding: 1rem;
+    border: 1px solid var(--border); text-align: center;
 }
-.stat-number { font-size: 1.8rem; font-weight: 700; color: #0f3460; }
-.stat-label  { font-size: 0.78rem; color: #64748b; margin-top: 2px; }
+.stat-num   { font-size: 1.9rem; font-weight: 700; }
+.stat-label { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
 
-.step-badge {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 26px; height: 26px; border-radius: 50%;
-    background: #0f3460; color: white; font-size: 0.75rem; font-weight: 700;
-    margin-right: 8px;
+/* Action item rows */
+.action-row {
+    display: flex; gap: 10px; padding: 8px 0;
+    border-bottom: 1px solid var(--border); align-items: flex-start;
 }
-.section-header {
-    font-weight: 600; font-size: 1rem; color: #1e293b;
-    padding: 0.4rem 0; border-bottom: 2px solid #e2e8f0;
-    margin-bottom: 1rem;
+.action-row:last-child { border-bottom: none; }
+
+/* Upload zone hint */
+.upload-hint {
+    background: var(--primary-light); border: 2px dashed #a5b4fc;
+    border-radius: 12px; padding: 2rem; text-align: center; color: var(--primary);
+}
+
+/* Info strip */
+.info-strip {
+    background: var(--primary-light); border-left: 4px solid var(--primary);
+    border-radius: 0 8px 8px 0; padding: 0.7rem 1rem;
+    font-size: 0.88rem; color: #3730a3; margin-bottom: 1rem;
+}
+
+/* CTA banner */
+.cta-banner {
+    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    border-radius: 10px; padding: 0.9rem 1.2rem;
+    color: white; display: flex; align-items: center;
+    justify-content: space-between; gap: 1rem; margin: 1rem 0;
 }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ── Session State ────────────────────────────────────────────────────────────
+# ── Session state ─────────────────────────────────────────────────────────────
 def _init():
     defaults = {
-        "resumes": [],          # [{name, text, path, format}]
+        "resumes": [],
         "active_resume_idx": 0,
-        "jobs": [],             # [job_dict, ...]
+        "jobs": [],
         "selected_jobs": set(),
-        "results": {},          # job_idx -> {match, tailored, cover_letter, manual_actions, ...}
+        "results": {},
         "tmp_dir": tempfile.mkdtemp(prefix="jobpilot_"),
-        "job_suggestions": None,    # dict from suggest_job_searches()
-        "search_prefill": {},       # {"keywords": str, "location": str}
-        "candidate_name": "",       # cached for use in results display
+        "job_suggestions": None,
+        "search_prefill": {},
+        "candidate_name": "",
+        "last_search": {},
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -89,741 +192,698 @@ def _init():
 
 _init()
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def _source_badge(source: str) -> str:
+    s = source.lower()
+    if "linkedin"  in s: cls, label = "badge-linkedin",  "LinkedIn"
+    elif "indeed"  in s: cls, label = "badge-indeed",   "Indeed"
+    elif "glassdoor" in s: cls, label = "badge-glassdoor", "Glassdoor"
+    elif "google"  in s: cls, label = "badge-google",   "Google Jobs"
+    elif "muse"    in s: cls, label = "badge-muse",     "The Muse"
+    elif "remoteok" in s: cls, label = "badge-remoteok", "RemoteOK"
+    elif "manual"  in s: cls, label = "badge-manual",   "Manual"
+    else:                 cls, label = "badge-default",  source.split("(")[0].strip()
+    return f'<span class="badge {cls}">{label}</span>'
 
-# ── Sidebar ──────────────────────────────────────────────────────────────────
+def _score_class(score):
+    if score >= 75: return "ring-high"
+    if score >= 50: return "ring-medium"
+    return "ring-low"
+
+def _active_step():
+    if not st.session_state.resumes:           return 1
+    if not st.session_state.jobs:              return 2
+    if not st.session_state.selected_jobs:     return 3
+    return 4
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# SIDEBAR
+# ════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown('<p class="main-title">🚀 JobPilot AI</p>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">Smart job application system</p>', unsafe_allow_html=True)
+    st.markdown("## 🚀 JobPilot AI")
+    st.caption("AI-powered job applications")
     st.divider()
 
-    st.markdown("### 🤖 AI / LLM")
+    # Workflow progress
+    st.markdown("**Your progress**")
+    step = _active_step()
+    steps = [
+        ("Upload your resume",    len(st.session_state.resumes) > 0),
+        ("Search for jobs",       len(st.session_state.jobs) > 0),
+        ("Select jobs to apply",  len(st.session_state.selected_jobs) > 0),
+        ("Generate & apply",      len(st.session_state.results) > 0),
+    ]
+    for i, (label, done) in enumerate(steps, 1):
+        is_active = (i == step)
+        row_cls = "step-row step-done" if done else ("step-row step-active" if is_active else "step-row")
+        num_html = "✓" if done else str(i)
+        st.markdown(
+            f'<div class="{row_cls}">'
+            f'<div class="step-num">{num_html}</div>'
+            f'<div class="step-label">{label}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.divider()
+
+    # Stats
+    r = len(st.session_state.resumes)
+    j = len(st.session_state.jobs)
+    s = len(st.session_state.selected_jobs)
+    p = len(st.session_state.results)
+    c1, c2 = st.columns(2)
+    with c1:
+        st.metric("Resumes", r)
+        st.metric("Selected", s)
+    with c2:
+        st.metric("Jobs Found", j)
+        st.metric("Processed", p)
+
+    st.divider()
+
+    # AI engine status — no user-facing key input
     from utils.ai_tailor import get_provider, get_provider_label, is_deployed
-    provider_label = get_provider_label()
-    env_label = "☁️ Deployed" if is_deployed() else "💻 Local"
-    if get_provider() == "none":
-        st.error(f"{env_label} · ⚠️ No LLM key set")
-    elif get_provider() == "ollama":
-        st.info(f"{env_label} · **{provider_label}**")
+    provider = get_provider()
+    label    = get_provider_label()
+    if provider == "none":
+        st.error("⚠️ AI not configured")
     else:
-        st.success(f"{env_label} · **{provider_label}**")
-
-    anthropic_key = st.text_input(
-        "Anthropic API Key (Claude)",
-        value=os.getenv("ANTHROPIC_API_KEY", ""),
-        type="password",
-        help="console.anthropic.com — Haiku is fast and cheap",
-    )
-    google_key = st.text_input(
-        "Google API Key (Gemini — free)",
-        value=os.getenv("GOOGLE_API_KEY", ""),
-        type="password",
-        help="aistudio.google.com → Get API key — 1M tokens/day free",
-    )
-    openai_key = st.text_input(
-        "OpenAI API Key",
-        value=os.getenv("OPENAI_API_KEY", ""),
-        type="password",
-    )
+        st.success(f"✦ Powered by **{label}**")
+        if provider == "ollama":
+            st.caption("Running locally · upgrade to cloud for best results")
 
     st.divider()
-
-    st.markdown("### 🔑 Job Search API Keys")
-    st.caption("The Muse and RemoteOK work without any keys.")
-
-    serpapi_key = st.text_input(
-        "SerpAPI Key ⭐ (Google Jobs)",
-        value=os.getenv("SERPAPI_KEY", ""),
-        type="password",
-        help="Best source — aggregates LinkedIn, Indeed, Glassdoor. 100 free searches/month at serpapi.com",
-    )
-    rapidapi_key = st.text_input(
-        "RapidAPI Key (JSearch / LinkedIn / Indeed)",
-        value=os.getenv("RAPIDAPI_KEY", ""),
-        type="password",
-        help="Free tier at rapidapi.com — search 'JSearch' to subscribe",
-    )
-    adzuna_id = st.text_input(
-        "Adzuna App ID",
-        value=os.getenv("ADZUNA_APP_ID", ""),
-        type="password",
-        help="Free at developer.adzuna.com",
-    )
-    adzuna_key = st.text_input(
-        "Adzuna API Key",
-        value=os.getenv("ADZUNA_API_KEY", ""),
-        type="password",
-    )
-
-    if st.button("💾 Save Keys", use_container_width=True):
-        if anthropic_key:
-            os.environ["ANTHROPIC_API_KEY"] = anthropic_key
-        if google_key:
-            os.environ["GOOGLE_API_KEY"] = google_key
-        if openai_key:
-            os.environ["OPENAI_API_KEY"] = openai_key
-        os.environ["SERPAPI_KEY"] = serpapi_key
-        os.environ["RAPIDAPI_KEY"] = rapidapi_key
-        os.environ["ADZUNA_APP_ID"] = adzuna_id
-        os.environ["ADZUNA_API_KEY"] = adzuna_key
-        st.success("Keys saved!")
-        st.rerun()
-
-    # Show active sources
-    from utils.job_search import get_active_sources
-    active_srcs = get_active_sources()
-    st.caption("**Job sources:** " + ", ".join(active_srcs))
-
-    st.divider()
-
-    # Status indicators
-    st.markdown("### 📊 Status")
-    col1, col2 = st.columns(2)
-    with col1:
-        r_count = len(st.session_state.resumes)
-        st.metric("Resumes", r_count)
-    with col2:
-        j_count = len(st.session_state.jobs)
-        st.metric("Jobs Found", j_count)
-
-    sel_count = len(st.session_state.selected_jobs)
-    proc_count = len(st.session_state.results)
-    col3, col4 = st.columns(2)
-    with col3:
-        st.metric("Selected", sel_count)
-    with col4:
-        st.metric("Processed", proc_count)
-
-    st.divider()
-    st.caption("v1.0 · Built with Claude + Streamlit")
+    st.caption("JobPilot AI · v2.0")
 
 
-# ── Tabs ─────────────────────────────────────────────────────────────────────
+# ════════════════════════════════════════════════════════════════════════════
+# TABS
+# ════════════════════════════════════════════════════════════════════════════
 tab1, tab2, tab3, tab4 = st.tabs([
-    "📄 Resumes",
-    "🔍 Job Search",
-    "🤖 AI Apply",
-    "📊 Tracker",
+    "📄  Resume",
+    "🔍  Find Jobs",
+    "⚡  AI Apply",
+    "📊  Tracker",
 ])
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# TAB 1 — RESUMES
+# TAB 1 — RESUME
 # ════════════════════════════════════════════════════════════════════════════
 with tab1:
-    st.markdown("## 📄 Resume Manager")
-    st.caption("Upload one or more resume versions. The AI will use the selected one as the base.")
+    has_resumes = bool(st.session_state.resumes)
+
+    if not has_resumes:
+        # Welcome hero
+        st.markdown("""
+        <div class="hero">
+          <h1>Welcome to JobPilot AI</h1>
+          <p>Upload your resume and let AI find, match, and tailor applications for you — in minutes.</p>
+          <div class="hero-pills">
+            <span class="hero-pill">🔍 Searches LinkedIn &amp; Indeed</span>
+            <span class="hero-pill">🤖 Powered by Claude Sonnet</span>
+            <span class="hero-pill">📄 Tailored resume per job</span>
+            <span class="hero-pill">📝 Cover letter included</span>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("### Start here — upload your resume")
+        st.caption("PDF or DOCX · your file stays private and is never stored on our servers")
+    else:
+        st.markdown("## 📄 Your Resume")
+        active = st.session_state.resumes[st.session_state.active_resume_idx]
+        st.markdown(
+            f'<div class="info-strip">Active resume: <strong>{active["display_name"]}</strong> · '
+            f'~{len(active["raw_text"].split())} words · {active["format"].upper()}</div>',
+            unsafe_allow_html=True,
+        )
 
     uploaded = st.file_uploader(
-        "Upload resume(s)",
+        "Upload resume",
         type=["pdf", "docx"],
         accept_multiple_files=True,
         label_visibility="collapsed",
+        help="Upload PDF or DOCX",
     )
 
     if uploaded:
-        from utils.resume_parser import parse_resume, extract_name_from_resume
-
-        new_names = {r["name"] for r in st.session_state.resumes}
+        from utils.resume_parser import parse_resume
+        existing = {r["name"] for r in st.session_state.resumes}
         added = 0
         for f in uploaded:
-            if f.name in new_names:
+            if f.name in existing:
                 continue
-            save_path = os.path.join(st.session_state.tmp_dir, f.name)
-            with open(save_path, "wb") as fp:
+            path = os.path.join(st.session_state.tmp_dir, f.name)
+            with open(path, "wb") as fp:
                 fp.write(f.read())
             try:
-                parsed = parse_resume(save_path)
+                parsed = parse_resume(path)
                 parsed["display_name"] = f.name
                 st.session_state.resumes.append(parsed)
                 added += 1
-                new_names.add(f.name)
+                existing.add(f.name)
             except Exception as e:
-                st.error(f"Failed to parse {f.name}: {e}")
-
+                st.error(f"Could not read {f.name}: {e}")
         if added:
-            st.success(f"✅ Added {added} resume(s).")
+            st.success(f"✅ {added} resume(s) uploaded. Head to **Find Jobs** to get started.")
+            st.rerun()
 
-    if not st.session_state.resumes:
-        st.info("⬆️ Upload at least one resume (PDF or DOCX) to get started.")
-    else:
-        st.markdown("### Your Resumes")
-
+    if st.session_state.resumes:
+        st.markdown("---")
         for i, resume in enumerate(st.session_state.resumes):
             is_active = st.session_state.active_resume_idx == i
-            border_style = "border: 2px solid #0f3460;" if is_active else "border: 1px solid #e2e8f0;"
+            border = "border: 2px solid #6366f1;" if is_active else ""
             with st.container():
-                st.markdown(
-                    f'<div class="job-card" style="{border_style}">',
-                    unsafe_allow_html=True,
-                )
-                col_a, col_b, col_c = st.columns([5, 2, 2])
-                with col_a:
-                    badge = "🟢 Active" if is_active else "⚪ Inactive"
-                    st.markdown(f"**{resume['display_name']}** &nbsp; {badge}", unsafe_allow_html=True)
-                    preview = resume["raw_text"][:180].replace("\n", " ")
-                    st.caption(f"{preview}…")
-                with col_b:
-                    st.caption(f"Format: `{resume['format'].upper()}`")
-                    word_count = len(resume["raw_text"].split())
-                    st.caption(f"~{word_count} words")
-                with col_c:
-                    if not is_active:
-                        if st.button("Set Active", key=f"active_{i}"):
-                            st.session_state.active_resume_idx = i
-                            st.rerun()
-                    if st.button("Remove", key=f"remove_{i}"):
+                st.markdown(f'<div class="jcard" style="{border}">', unsafe_allow_html=True)
+                ca, cb, cc = st.columns([6, 2, 2])
+                with ca:
+                    badge_html = '<span style="color:#6366f1;font-size:0.75rem;font-weight:600">● ACTIVE</span>' if is_active else '<span style="color:#94a3b8;font-size:0.75rem">○ inactive</span>'
+                    st.markdown(f"**{resume['display_name']}** &nbsp; {badge_html}", unsafe_allow_html=True)
+                    st.caption(resume["raw_text"][:160].replace("\n", " ") + "…")
+                with cb:
+                    st.caption(f"`{resume['format'].upper()}` · {len(resume['raw_text'].split())} words")
+                with cc:
+                    if not is_active and st.button("Set active", key=f"act_{i}", use_container_width=True):
+                        st.session_state.active_resume_idx = i
+                        st.rerun()
+                    if st.button("Remove", key=f"rm_{i}", use_container_width=True):
                         st.session_state.resumes.pop(i)
-                        if st.session_state.active_resume_idx >= len(st.session_state.resumes):
-                            st.session_state.active_resume_idx = 0
+                        st.session_state.active_resume_idx = max(0, st.session_state.active_resume_idx - 1)
                         st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
 
-        if st.session_state.resumes:
-            with st.expander("👁️ Preview Active Resume Text"):
-                active = st.session_state.resumes[st.session_state.active_resume_idx]
-                st.text_area("", active["raw_text"], height=400, label_visibility="collapsed")
+        with st.expander("👁️ Preview resume text"):
+            st.text_area(
+                "", st.session_state.resumes[st.session_state.active_resume_idx]["raw_text"],
+                height=380, label_visibility="collapsed",
+            )
+
+        # CTA to next step
+        st.markdown(
+            '<div class="cta-banner">'
+            '<span>Resume ready — now find jobs that fit your profile</span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 2 — JOB SEARCH
 # ════════════════════════════════════════════════════════════════════════════
 with tab2:
-    st.markdown("## 🔍 Job Search")
-    from utils.job_search import get_active_sources
-    active_srcs = get_active_sources()
-    st.caption(f"Searching across: **{', '.join(active_srcs)}**. Results are deduplicated automatically.")
+    st.markdown("## 🔍 Find Jobs")
 
-    # ── AI Job Recommendations ──────────────────────────────────────────────
+    if not st.session_state.resumes:
+        st.info("⬅️ Upload your resume first so AI can recommend the right searches for you.")
+
+    # ── AI recommendations ────────────────────────────────────────────────
     if st.session_state.resumes:
-        st.markdown("### 🎯 AI Job Recommendations")
-        st.caption("Let the AI analyze your resume and suggest what to search for.")
+        with st.container():
+            col_hd, col_btn = st.columns([4, 2])
+            with col_hd:
+                st.markdown("### 🎯 AI Job Recommendations")
+                st.caption("Claude analyses your resume and suggests the best searches for you")
+            with col_btn:
+                st.markdown("<div style='margin-top:1rem'>", unsafe_allow_html=True)
+                recommend_btn = st.button("✨ Recommend jobs for me", type="primary", use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
 
-        col_suggest, col_clear = st.columns([3, 1])
-        with col_suggest:
-            suggest_btn = st.button(
-                "🎯 Recommend Jobs for Me",
-                type="secondary",
-                use_container_width=True,
-            )
-        with col_clear:
-            if st.session_state.job_suggestions:
-                if st.button("✕ Clear Suggestions", use_container_width=True):
-                    st.session_state.job_suggestions = None
-                    st.session_state.search_prefill = {}
-                    st.rerun()
-
-        if suggest_btn:
+        if recommend_btn:
             from utils.ai_tailor import suggest_job_searches
             active_r = st.session_state.resumes[st.session_state.active_resume_idx]
-            with st.spinner("Analyzing your resume…"):
+            with st.spinner("Analysing your resume with Claude Sonnet…"):
                 st.session_state.job_suggestions = suggest_job_searches(active_r["raw_text"])
+                st.session_state.search_prefill = {}
             st.rerun()
 
         if st.session_state.job_suggestions:
             sugg = st.session_state.job_suggestions
-            exp_level = sugg.get("experience_level", "")
-            if exp_level and exp_level != "unknown":
-                st.caption(f"Detected experience level: **{exp_level}**")
+            exp = sugg.get("experience_level", "")
+            titles = sugg.get("primary_titles", []) + sugg.get("alternative_titles", [])
 
-            all_titles = sugg.get("primary_titles", []) + sugg.get("alternative_titles", [])
-            if all_titles:
-                st.markdown("**Relevant job titles:** " + "  ·  ".join(f"`{t}`" for t in all_titles))
+            if exp and exp != "unknown":
+                st.markdown(
+                    f'<div class="info-strip">Claude detected you as <strong>{exp}</strong> · '
+                    f'suggested titles: {", ".join(f"<strong>{t}</strong>" for t in titles[:4])}</div>',
+                    unsafe_allow_html=True,
+                )
 
-            st.markdown("**Suggested searches:**")
-            for i, s in enumerate(sugg.get("suggested_searches", [])):
-                col_info, col_btn = st.columns([5, 2])
-                with col_info:
-                    loc_type = s.get("location_type", "any")
-                    loc_icon = {"remote": "🌐", "onsite": "🏢", "hybrid": "🔄"}.get(loc_type, "📍")
-                    st.markdown(f"{loc_icon} **{s['keywords']}**")
-                    st.caption(s.get("rationale", ""))
-                with col_btn:
-                    if st.button("Use This Search", key=f"use_sugg_{i}", use_container_width=True):
+            cols = st.columns(min(len(sugg.get("suggested_searches", [])), 3))
+            for i, s in enumerate(sugg.get("suggested_searches", [])[:3]):
+                loc_icon = {"remote": "🌐", "onsite": "🏢", "hybrid": "🔄"}.get(s.get("location_type", ""), "📍")
+                with cols[i]:
+                    st.markdown(
+                        f'<div class="jcard">'
+                        f'<div class="jcard-title">{loc_icon} {s["keywords"]}</div>'
+                        f'<div class="jcard-company" style="margin-top:4px">{s.get("rationale","")}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                    if st.button("Search this →", key=f"sugg_{i}", use_container_width=True):
                         st.session_state.search_prefill = {
                             "keywords": s["keywords"],
                             "location": "Remote" if s.get("location_type") == "remote" else "",
                         }
                         st.rerun()
 
-        st.divider()
+            if st.button("✕ Clear recommendations", type="secondary"):
+                st.session_state.job_suggestions = None
+                st.session_state.search_prefill = {}
+                st.rerun()
 
-    with st.form("search_form"):
-        col1, col2, col3 = st.columns([3, 2, 1])
-        with col1:
+        st.markdown("---")
+
+    # ── Search form ───────────────────────────────────────────────────────
+    with st.form("search_form", clear_on_submit=False):
+        st.markdown("### Search")
+        fc1, fc2, fc3 = st.columns([4, 3, 1])
+        with fc1:
             keywords = st.text_input(
-                "Job Title / Keywords *",
+                "Job title or keywords",
                 value=st.session_state.search_prefill.get("keywords", ""),
-                placeholder="e.g. Software Engineer, Data Scientist",
+                placeholder="e.g. Software Engineer, Data Analyst",
             )
-        with col2:
+        with fc2:
             country = st.selectbox(
                 "Country",
-                options=["United States", "United Kingdom", "Canada", "Australia", "Germany"],
-                index=0,
+                ["United States", "United Kingdom", "Canada", "Australia", "Germany"],
             )
-        with col3:
-            num_results = st.number_input("Max Results", 5, 50, 20)
+        with fc3:
+            num_results = st.number_input("Results", 5, 50, 20, label_visibility="visible")
 
         location = st.text_input(
-            "City / State (optional)",
+            "City or state (optional — leave blank for nationwide)",
             value=st.session_state.search_prefill.get("location", ""),
-            placeholder="e.g. New York, NY · San Francisco · Remote  (leave blank to search all of the country)",
+            placeholder="e.g. New York · Austin, TX · Remote",
         )
 
-        col4, col5 = st.columns([2, 2])
-        with col4:
-            remote_only = st.checkbox("Remote only")
-        with col5:
-            min_salary = st.number_input("Min. Salary ($)", 0, 500000, 0, step=10000)
+        ff1, ff2 = st.columns(2)
+        with ff1:
+            remote_only = st.checkbox("Remote jobs only")
+        with ff2:
+            min_salary = st.number_input("Min. salary (USD)", 0, 500_000, 0, step=10_000)
 
-        search_btn = st.form_submit_button("🔍 Search Jobs", use_container_width=True, type="primary")
+        search_btn = st.form_submit_button("🔍 Search jobs", use_container_width=True, type="primary")
 
     if search_btn:
         st.session_state.search_prefill = {}
-        if not keywords:
-            st.warning("Please enter job title or keywords.")
+        if not keywords.strip():
+            st.warning("Enter a job title or keywords to search.")
         else:
             from utils.job_search import search_jobs
-            loc_display = f"{location}, {country}" if location else country
-            with st.spinner(f"Searching {loc_display}..."):
-                jobs = search_jobs(keywords, location, country=country, num=num_results)
-
-            # Apply filters
+            loc_display = f"{location.strip()}, {country}" if location.strip() else country
+            with st.spinner(f"Searching {loc_display}…"):
+                jobs = search_jobs(keywords.strip(), location.strip(), country=country, num=num_results)
             if remote_only:
-                jobs = [j for j in jobs if j.get("remote") or "remote" in (j.get("title", "") + j.get("location", "")).lower()]
+                jobs = [j for j in jobs if j.get("remote") or "remote" in (j.get("location", "") + j.get("title", "")).lower()]
             if min_salary > 0:
                 jobs = [j for j in jobs if (j.get("salary_min") or 0) >= min_salary or (j.get("salary_max") or 0) >= min_salary]
-
             st.session_state.jobs = jobs
             st.session_state.selected_jobs = set()
+            st.session_state.last_search = {"keywords": keywords, "location": loc_display}
+            if not jobs:
+                st.warning("No jobs found. Try simpler keywords or leave the city field blank.")
 
-            if jobs:
-                st.success(f"Found **{len(jobs)}** jobs in **{loc_display}**.")
-            else:
-                st.warning("No results found. Try broader keywords, a different city, or leave the city field blank to search all of the country.")
+    # ── Manual paste ──────────────────────────────────────────────────────
+    with st.expander("📋 Paste a job from LinkedIn / Indeed manually"):
+        st.caption("Found a job you like? Paste the details here and it'll be added to your list.")
+        with st.form("manual_form"):
+            mc1, mc2 = st.columns(2)
+            with mc1:
+                mj_title   = st.text_input("Job title *", placeholder="Senior Software Engineer")
+                mj_company = st.text_input("Company *",   placeholder="Acme Corp")
+            with mc2:
+                mj_loc = st.text_input("Location", placeholder="New York, NY or Remote")
+                mj_url = st.text_input("Job URL",  placeholder="https://linkedin.com/jobs/…")
+            mj_desc = st.text_area("Job description *", placeholder="Paste the full job description…", height=160)
+            add_btn = st.form_submit_button("➕ Add to list", type="primary")
 
-    # ── Manual Job Entry ────────────────────────────────────────────────────
-    st.divider()
-    st.markdown("### 📋 Add a Job Manually")
-    st.caption("Paste any job from LinkedIn, Indeed, or anywhere — no API keys needed.")
-
-    with st.expander("➕ Add job manually", expanded=not bool(st.session_state.jobs)):
-        with st.form("manual_job_form"):
-            mj_col1, mj_col2 = st.columns(2)
-            with mj_col1:
-                mj_title = st.text_input("Job Title *", placeholder="e.g. Senior Software Engineer")
-                mj_company = st.text_input("Company *", placeholder="e.g. Acme Corp")
-            with mj_col2:
-                mj_location = st.text_input("Location", placeholder="e.g. New York, NY or Remote")
-                mj_url = st.text_input("Job URL (optional)", placeholder="https://...")
-            mj_desc = st.text_area(
-                "Job Description *",
-                placeholder="Paste the full job description here…",
-                height=200,
-            )
-            add_job_btn = st.form_submit_button("➕ Add to Job List", use_container_width=True, type="primary")
-
-        if add_job_btn:
+        if add_btn:
             if not mj_title or not mj_company or not mj_desc:
-                st.error("Job Title, Company, and Job Description are required.")
+                st.error("Title, company and description are required.")
             else:
-                manual_job = {
-                    "title": mj_title.strip(),
-                    "company": mj_company.strip(),
-                    "location": mj_location.strip() or "Not specified",
-                    "description": mj_desc.strip(),
-                    "url": mj_url.strip(),
-                    "salary_min": None,
-                    "salary_max": None,
+                manual = {
+                    "title": mj_title.strip(), "company": mj_company.strip(),
+                    "location": mj_loc.strip() or "Not specified",
+                    "description": mj_desc.strip(), "url": mj_url.strip(),
+                    "salary_min": None, "salary_max": None,
                     "salary_display": "Not specified",
-                    "posted_date": "",
-                    "source": "Manual",
-                    "employment_type": "",
-                    "remote": "remote" in mj_location.lower(),
+                    "posted_date": "", "source": "Manual", "employment_type": "",
+                    "remote": "remote" in mj_loc.lower(),
                 }
-                # Avoid duplicate by (title, company)
-                existing = {
-                    (j["title"].lower().strip(), j["company"].lower().strip())
-                    for j in st.session_state.jobs
-                }
-                key = (manual_job["title"].lower(), manual_job["company"].lower())
-                if key in existing:
-                    st.warning("This job is already in the list.")
+                key = (manual["title"].lower(), manual["company"].lower())
+                existing_keys = {(j["title"].lower(), j["company"].lower()) for j in st.session_state.jobs}
+                if key in existing_keys:
+                    st.warning("Already in your list.")
                 else:
-                    st.session_state.jobs.append(manual_job)
-                    st.success(f"✅ Added **{mj_title}** at **{mj_company}** to the job list.")
+                    st.session_state.jobs.append(manual)
+                    st.success(f"✅ Added **{mj_title}** at **{mj_company}**.")
                     st.rerun()
 
+    # ── Job results ───────────────────────────────────────────────────────
     if st.session_state.jobs:
-        st.divider()
-
-        col_sel, col_clr = st.columns([3, 1])
-        with col_sel:
-            st.markdown(f"### Results ({len(st.session_state.jobs)} jobs)")
-        with col_clr:
-            if st.button("☑️ Select All"):
+        st.markdown("---")
+        hdr1, hdr2, hdr3 = st.columns([4, 1, 1])
+        with hdr1:
+            search_info = st.session_state.last_search
+            title_str = f'"{search_info.get("keywords", "")}" in {search_info.get("location", "")}' if search_info else ""
+            st.markdown(f"### {len(st.session_state.jobs)} jobs found {title_str}")
+        with hdr2:
+            if st.button("Select all", use_container_width=True):
                 st.session_state.selected_jobs = set(range(len(st.session_state.jobs)))
                 st.rerun()
-            if st.button("☐ Deselect All"):
+        with hdr3:
+            if st.button("Clear all", use_container_width=True):
                 st.session_state.selected_jobs = set()
                 st.rerun()
 
         for idx, job in enumerate(st.session_state.jobs):
-            is_selected = idx in st.session_state.selected_jobs
-            border = "border: 2px solid #0f3460;" if is_selected else ""
+            selected = idx in st.session_state.selected_jobs
+            card_cls = "jcard selected" if selected else "jcard"
+
+            salary = job.get("salary_display", "")
+            salary_str = f"💰 {salary}" if salary and salary != "Not specified" else ""
+            emp_str = f"🕐 {job['employment_type']}" if job.get("employment_type") else ""
+            remote_str = "🌐 Remote" if job.get("remote") else ""
+            date_str = f"📅 {job['posted_date']}" if job.get("posted_date") else ""
+
+            meta_parts = [p for p in [f"📍 {job['location']}", salary_str, emp_str, remote_str, date_str] if p]
+            badge_html = _source_badge(job.get("source", ""))
 
             with st.container():
-                st.markdown(f'<div class="job-card" style="{border}">', unsafe_allow_html=True)
-
-                row1, row2 = st.columns([6, 1])
-                with row1:
-                    st.markdown(f"**{job['title']}** at **{job['company']}**")
-                    meta_parts = [f"📍 {job['location']}"]
-                    if job.get("salary_display") and job["salary_display"] != "Not specified":
-                        meta_parts.append(f"💰 {job['salary_display']}")
-                    if job.get("employment_type"):
-                        meta_parts.append(f"🕐 {job['employment_type']}")
-                    if job.get("remote"):
-                        meta_parts.append("🌐 Remote")
-                    meta_parts.append(f"🔗 {job['source']}")
-                    if job.get("posted_date"):
-                        meta_parts.append(f"📅 {job['posted_date']}")
-                    st.caption("  ·  ".join(meta_parts))
-                with row2:
-                    if is_selected:
-                        if st.button("✅ Selected", key=f"sel_{idx}"):
+                st.markdown(f'<div class="{card_cls}">', unsafe_allow_html=True)
+                col_info, col_action = st.columns([7, 2])
+                with col_info:
+                    st.markdown(
+                        f'<div class="jcard-title">{job["title"]} &nbsp;{badge_html}</div>'
+                        f'<div class="jcard-company">{job["company"]}</div>'
+                        f'<div class="jcard-meta">{"  ·  ".join(meta_parts)}</div>',
+                        unsafe_allow_html=True,
+                    )
+                with col_action:
+                    btn_label = "✅ Selected" if selected else "+ Select"
+                    btn_type  = "primary" if selected else "secondary"
+                    if st.button(btn_label, key=f"sel_{idx}", use_container_width=True, type=btn_type):
+                        if selected:
                             st.session_state.selected_jobs.discard(idx)
-                            st.rerun()
-                    else:
-                        if st.button("+ Select", key=f"sel_{idx}"):
+                        else:
                             st.session_state.selected_jobs.add(idx)
-                            st.rerun()
+                        st.rerun()
 
-                with st.expander("📄 Job Description"):
+                with st.expander("View description"):
                     desc = job.get("description", "No description available.")
-                    st.write(desc[:1500] + ("…" if len(desc) > 1500 else ""))
+                    st.write(desc[:2000] + ("…" if len(desc) > 2000 else ""))
                     if job.get("url"):
-                        st.link_button("🔗 View Full Posting", job["url"])
+                        st.link_button("Open original posting ↗", job["url"])
 
                 st.markdown("</div>", unsafe_allow_html=True)
 
         if st.session_state.selected_jobs:
-            st.success(f"**{len(st.session_state.selected_jobs)}** job(s) selected. Go to the **🤖 AI Apply** tab to process them.")
+            n = len(st.session_state.selected_jobs)
+            st.markdown(
+                f'<div class="cta-banner">'
+                f'<span><strong>{n} job{"s" if n > 1 else ""} selected</strong> — '
+                f'go to ⚡ AI Apply to generate your tailored resume and cover letter</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 3 — AI APPLY
 # ════════════════════════════════════════════════════════════════════════════
 with tab3:
-    st.markdown("## 🤖 AI-Powered Application")
+    st.markdown("## ⚡ AI Apply")
 
-    # Guard checks
+    # Guard: resume
     if not st.session_state.resumes:
-        st.warning("⬅️ Upload at least one resume in the **📄 Resumes** tab first.")
+        st.markdown(
+            '<div class="upload-hint">'
+            '<h3 style="margin:0 0 0.5rem">No resume uploaded yet</h3>'
+            '<p style="margin:0">Go to the <strong>📄 Resume</strong> tab and upload your resume first.</p>'
+            '</div>', unsafe_allow_html=True,
+        )
         st.stop()
+
+    # Guard: jobs selected
     if not st.session_state.selected_jobs:
-        st.warning("⬅️ Select jobs in the **🔍 Job Search** tab first.")
+        st.markdown(
+            '<div class="upload-hint">'
+            '<h3 style="margin:0 0 0.5rem">No jobs selected</h3>'
+            '<p style="margin:0">Go to <strong>🔍 Find Jobs</strong>, search for roles, and click <em>+ Select</em> on the ones you want to apply to.</p>'
+            '</div>', unsafe_allow_html=True,
+        )
         st.stop()
+
+    # Guard: LLM
     from utils.ai_tailor import get_provider, get_provider_label, is_deployed
     provider = get_provider()
     if provider == "none":
-        st.error(
-            "No LLM API key is set. Add **ANTHROPIC_API_KEY**, **GOOGLE_API_KEY**, "
-            "or **OPENAI_API_KEY** in your Render environment variables, then redeploy."
-        )
+        st.error("AI is not configured. Contact support or set up an LLM API key on the server.")
         st.stop()
     if provider == "ollama":
         import urllib.request
         try:
             urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
         except Exception:
-            st.warning(
-                "Ollama is not running. Start it with `ollama serve` — "
-                "or add a cloud key (Claude / Gemini / OpenAI) in the sidebar."
-            )
+            st.warning("Ollama isn't running. Run `ollama serve` in your terminal, then refresh.")
             st.stop()
 
-    active_resume = st.session_state.resumes[st.session_state.active_resume_idx]
-    selected_indices = sorted(st.session_state.selected_jobs)
-    selected_jobs = [st.session_state.jobs[i] for i in selected_indices]
-
-    st.info(f"Using resume: **{active_resume['display_name']}** · Processing **{len(selected_jobs)}** job(s)")
+    active_resume  = st.session_state.resumes[st.session_state.active_resume_idx]
+    sel_indices    = sorted(st.session_state.selected_jobs)
+    sel_jobs       = [st.session_state.jobs[i] for i in sel_indices]
 
     from utils.resume_parser import extract_name_from_resume
     candidate_name = extract_name_from_resume(active_resume["raw_text"])
     st.session_state.candidate_name = candidate_name
 
-    # Options
-    col_opt1, col_opt2 = st.columns(2)
-    with col_opt1:
-        gen_cover = st.checkbox("Generate Cover Letters", value=True)
-    with col_opt2:
-        auto_track = st.checkbox("Auto-add to Tracker", value=True)
+    # Summary strip
+    st.markdown(
+        f'<div class="info-strip">'
+        f'Resume: <strong>{active_resume["display_name"]}</strong> &nbsp;·&nbsp; '
+        f'<strong>{len(sel_jobs)}</strong> job{"s" if len(sel_jobs) > 1 else ""} selected &nbsp;·&nbsp; '
+        f'AI: <strong>{get_provider_label()}</strong>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
-    # Process all button
-    if st.button("⚡ Process All Selected Jobs", type="primary", use_container_width=True):
+    # Options row
+    opt1, opt2 = st.columns(2)
+    with opt1:
+        gen_cover  = st.checkbox("Generate cover letter for each job", value=True)
+    with opt2:
+        auto_track = st.checkbox("Auto-add to application tracker", value=True)
+
+    # Process button
+    if st.button("⚡ Generate applications for all selected jobs", type="primary", use_container_width=True):
         from utils.ai_tailor import analyze_match, tailor_resume, generate_cover_letter, generate_manual_actions
         from utils.excel_tracker import add_application
         from utils.resume_writer import create_tailored_docx, create_cover_letter_docx
 
-        progress_bar = st.progress(0, text="Initializing…")
-        status_text = st.empty()
+        bar    = st.progress(0)
+        status = st.empty()
 
-        for i, (orig_idx, job) in enumerate(zip(selected_indices, selected_jobs)):
-            pct = int((i / len(selected_jobs)) * 100)
-            progress_bar.progress(pct, text=f"Processing: {job['title']} at {job['company']}")
-
+        for i, (orig_idx, job) in enumerate(zip(sel_indices, sel_jobs)):
+            bar.progress(int(i / len(sel_jobs) * 100), text=f"Processing {i+1}/{len(sel_jobs)}: {job['title']} at {job['company']}")
             try:
-                # 1. Match analysis
-                status_text.caption(f"🔍 Analyzing match for {job['title']}…")
+                status.caption("🔍 Scoring match…")
                 match = analyze_match(active_resume["raw_text"], job)
 
-                # 2. Tailor resume
-                status_text.caption(f"✏️ Tailoring resume for {job['title']}…")
-                tailored_text = tailor_resume(active_resume["raw_text"], job)
+                status.caption("✏️ Tailoring resume…")
+                tailored = tailor_resume(active_resume["raw_text"], job)
 
-                # 3. Cover letter
-                cover_text = ""
+                cover = ""
                 if gen_cover:
-                    status_text.caption(f"📝 Writing cover letter for {job['title']}…")
-                    cover_text = generate_cover_letter(active_resume["raw_text"], job, candidate_name)
+                    status.caption("📝 Writing cover letter…")
+                    cover = generate_cover_letter(active_resume["raw_text"], job, candidate_name)
 
-                # 4. Generate manual action checklist (isolated — never blocks pipeline)
-                manual_actions = []
+                actions = []
                 try:
-                    status_text.caption(f"📋 Generating action checklist for {job['title']}…")
-                    manual_actions = generate_manual_actions(
-                        active_resume["raw_text"], job, tailored_text, cover_text
-                    )
+                    status.caption("📋 Generating action checklist…")
+                    actions = generate_manual_actions(active_resume["raw_text"], job, tailored, cover)
                 except Exception:
                     pass
 
-                # 5. Generate DOCX files
-                safe_company = "".join(c for c in job["company"] if c.isalnum() or c in " -_")[:30]
-                safe_title = "".join(c for c in job["title"] if c.isalnum() or c in " -_")[:30]
-                base_name = f"{safe_company}_{safe_title}".replace(" ", "_")
+                safe = lambda s: "".join(c for c in s if c.isalnum() or c in " -_")[:28].strip()
+                base = f"{safe(job['company'])}_{safe(job['title'])}".replace(" ", "_")
 
-                resume_path = os.path.join(st.session_state.tmp_dir, f"Resume_{base_name}.docx")
-                create_tailored_docx(tailored_text, job, resume_path, candidate_name)
+                r_path = os.path.join(st.session_state.tmp_dir, f"Resume_{base}.docx")
+                create_tailored_docx(tailored, job, r_path, candidate_name)
 
-                cover_path = ""
-                if gen_cover and cover_text:
-                    cover_path = os.path.join(st.session_state.tmp_dir, f"CoverLetter_{base_name}.docx")
-                    create_cover_letter_docx(cover_text, job, cover_path, candidate_name)
+                c_path = ""
+                if gen_cover and cover:
+                    c_path = os.path.join(st.session_state.tmp_dir, f"Cover_{base}.docx")
+                    create_cover_letter_docx(cover, job, c_path, candidate_name)
 
-                # 6. Track
                 if auto_track:
-                    add_application(
-                        job,
-                        match.get("match_score", 0),
-                        active_resume["display_name"],
-                        has_cover_letter=bool(cover_text),
-                    )
+                    add_application(job, match.get("match_score", 0), active_resume["display_name"], has_cover_letter=bool(cover))
 
-                # Save result
                 st.session_state.results[orig_idx] = {
-                    "match": match,
-                    "tailored_text": tailored_text,
-                    "cover_text": cover_text,
-                    "resume_path": resume_path,
-                    "cover_path": cover_path,
-                    "job": job,
-                    "manual_actions": manual_actions,
-                    "edited_resume": None,
-                    "edited_cover": None,
+                    "match": match, "tailored_text": tailored,
+                    "cover_text": cover, "resume_path": r_path, "cover_path": c_path,
+                    "job": job, "manual_actions": actions,
+                    "edited_resume": None, "edited_cover": None,
                 }
-
             except Exception as e:
-                st.error(f"Error processing {job['title']}: {e}")
+                st.error(f"Error on {job['title']}: {e}")
 
-        progress_bar.progress(100, text="✅ All done!")
-        status_text.empty()
-        st.success(f"🎉 Processed {len(selected_jobs)} job(s)! Scroll down to review and apply.")
+        bar.progress(100, text="✅ Done!")
+        status.empty()
+        st.success(f"🎉 Generated applications for {len(sel_jobs)} job(s). Review and download below.")
         st.balloons()
 
-    # ── Results ──
+    # ── Results ──────────────────────────────────────────────────────────
     if st.session_state.results:
-        st.divider()
-        st.markdown("### 📋 Results & Applications")
+        st.markdown("---")
+        st.markdown("### Your Applications")
 
-        for orig_idx, result in st.session_state.results.items():
-            job = result["job"]
+        # Sort by score descending
+        sorted_results = sorted(
+            st.session_state.results.items(),
+            key=lambda x: x[1]["match"].get("match_score", 0),
+            reverse=True,
+        )
+
+        for orig_idx, result in sorted_results:
+            job   = result["job"]
             match = result["match"]
             score = match.get("match_score", 0)
+            ring  = _score_class(score)
 
-            score_cls = "score-high" if score >= 75 else ("score-medium" if score >= 50 else "score-low")
+            header = f"{job['title']} at {job['company']} — {score}% match"
+            with st.expander(header, expanded=(score >= 65)):
 
-            with st.expander(
-                f"**{job['title']}** at {job['company']} — "
-                f"Match: {score}%",
-                expanded=score >= 60,
-            ):
-                # Match analysis
-                col_m1, col_m2, col_m3 = st.columns([1, 2, 2])
-                with col_m1:
-                    st.markdown(f'<div class="stat-box"><div class="stat-number">{score}%</div><div class="stat-label">Match Score</div></div>', unsafe_allow_html=True)
-                with col_m2:
+                # ── Score + skills row ──
+                sc1, sc2, sc3 = st.columns([1, 2, 2])
+                with sc1:
+                    st.markdown(
+                        f'<div class="score-ring {ring}">{score}%</div>'
+                        f'<p style="text-align:center;font-size:0.72rem;color:#64748b;margin-top:4px">match score</p>',
+                        unsafe_allow_html=True,
+                    )
+                with sc2:
                     if match.get("matching_skills"):
-                        st.markdown("**✅ Matching Skills**")
-                        st.write(", ".join(match["matching_skills"][:8]))
-                with col_m3:
+                        st.markdown("**✅ You have**")
+                        chips = "".join(f'<span class="chip chip-good">{s}</span>' for s in match["matching_skills"][:8])
+                        st.markdown(chips, unsafe_allow_html=True)
+                with sc3:
                     if match.get("missing_skills"):
-                        st.markdown("**⚠️ Skills to Highlight**")
-                        st.write(", ".join(match["missing_skills"][:8]))
+                        st.markdown("**⚠️ Gaps to address**")
+                        chips = "".join(f'<span class="chip chip-missing">{s}</span>' for s in match["missing_skills"][:8])
+                        st.markdown(chips, unsafe_allow_html=True)
 
                 if match.get("summary"):
-                    st.info(f"💡 {match['summary']}")
+                    st.info(match["summary"])
 
-                # Manual action checklist
-                manual_actions = result.get("manual_actions", [])
-                if manual_actions:
+                # ── Action checklist ──
+                actions = result.get("manual_actions", [])
+                if actions:
                     priority_order = {"high": 0, "medium": 1, "low": 2}
-                    sorted_actions = sorted(
-                        manual_actions,
-                        key=lambda x: priority_order.get(x.get("priority", "low"), 2),
-                    )
-                    priority_icons = {"high": "🔴", "medium": "🟡", "low": "🟢"}
-                    category_labels = {
-                        "verification": "Verify",
-                        "personalization": "Personalize",
-                        "portfolio": "Portfolio",
-                        "authenticity": "Authenticity",
-                        "formatting": "Formatting",
-                    }
-                    with st.expander("⚠️ Before You Apply — Action Items", expanded=True):
-                        for action_item in sorted_actions:
-                            priority = action_item.get("priority", "low")
-                            category = action_item.get("category", "")
-                            icon = priority_icons.get(priority, "🟢")
-                            cat_label = category_labels.get(category, category.title())
-                            col_icon, col_content = st.columns([1, 12])
-                            with col_icon:
-                                st.markdown(f"### {icon}")
-                            with col_content:
-                                st.markdown(f"**[{cat_label}]** {action_item.get('action', '')}")
-                                if action_item.get("reason"):
-                                    st.caption(action_item["reason"])
+                    priority_icon  = {"high": "🔴", "medium": "🟡", "low": "🟢"}
+                    cat_label      = {"verification": "Verify", "personalization": "Personalise",
+                                      "portfolio": "Portfolio", "authenticity": "Authenticity", "formatting": "Format"}
+                    with st.expander("📋 Before you submit — action checklist", expanded=True):
+                        for a in sorted(actions, key=lambda x: priority_order.get(x.get("priority","low"), 2)):
+                            icon = priority_icon.get(a.get("priority","low"), "🟢")
+                            cat  = cat_label.get(a.get("category",""), a.get("category","").title())
+                            st.markdown(
+                                f'<div class="action-row">'
+                                f'<span style="font-size:1rem">{icon}</span>'
+                                f'<div><strong>[{cat}]</strong> {a.get("action","")}'
+                                f'<br><span style="font-size:0.78rem;color:#64748b">{a.get("reason","")}</span></div>'
+                                f'</div>',
+                                unsafe_allow_html=True,
+                            )
 
-                st.divider()
+                st.markdown("---")
 
-                # Download buttons — use edited version if available
+                # ── Downloads + apply ──
                 from utils.resume_writer import create_tailored_docx, create_cover_letter_docx
-                _cname = st.session_state.get("candidate_name", "Candidate")
+                _cn = st.session_state.get("candidate_name", "Candidate")
+                d1, d2, d3 = st.columns(3)
 
-                doc_col1, doc_col2, doc_col3 = st.columns([2, 2, 2])
-
-                with doc_col1:
+                with d1:
                     st.markdown("**📄 Tailored Resume**")
-                    edited_r_text = result.get("edited_resume")
-                    if edited_r_text:
-                        tmp_edited_r = os.path.join(
-                            st.session_state.tmp_dir, f"Edited_Resume_{orig_idx}.docx"
-                        )
-                        create_tailored_docx(edited_r_text, job, tmp_edited_r, _cname)
-                        with open(tmp_edited_r, "rb") as f:
+                    r_text = result.get("edited_resume") or result["tailored_text"]
+                    r_file = result.get("resume_path", "")
+                    if result.get("edited_resume"):
+                        tmp = os.path.join(st.session_state.tmp_dir, f"Edited_R_{orig_idx}.docx")
+                        create_tailored_docx(r_text, job, tmp, _cn)
+                        r_file = tmp
+                    if r_file and os.path.exists(r_file):
+                        with open(r_file, "rb") as f:
                             st.download_button(
-                                "⬇️ Download Resume (.docx) ✏️",
+                                "⬇️ Download Resume",
                                 data=f.read(),
-                                file_name=os.path.basename(result["resume_path"]),
+                                file_name=os.path.basename(r_file),
                                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                key=f"dl_resume_{orig_idx}",
+                                key=f"dl_r_{orig_idx}",
                                 use_container_width=True,
-                            )
-                    elif os.path.exists(result.get("resume_path", "")):
-                        with open(result["resume_path"], "rb") as f:
-                            st.download_button(
-                                "⬇️ Download Resume (.docx)",
-                                data=f.read(),
-                                file_name=os.path.basename(result["resume_path"]),
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                key=f"dl_resume_{orig_idx}",
-                                use_container_width=True,
+                                type="primary",
                             )
 
-                with doc_col2:
-                    edited_c_text = result.get("edited_cover")
-                    has_cover = result.get("cover_text") or edited_c_text
-                    if has_cover:
+                with d2:
+                    cover_text = result.get("edited_cover") or result.get("cover_text", "")
+                    if cover_text:
                         st.markdown("**📝 Cover Letter**")
-                        if edited_c_text:
-                            tmp_edited_c = os.path.join(
-                                st.session_state.tmp_dir, f"Edited_Cover_{orig_idx}.docx"
-                            )
-                            create_cover_letter_docx(edited_c_text, job, tmp_edited_c, _cname)
-                            with open(tmp_edited_c, "rb") as f:
+                        c_file = result.get("cover_path", "")
+                        if result.get("edited_cover"):
+                            tmp = os.path.join(st.session_state.tmp_dir, f"Edited_C_{orig_idx}.docx")
+                            create_cover_letter_docx(cover_text, job, tmp, _cn)
+                            c_file = tmp
+                        if c_file and os.path.exists(c_file):
+                            with open(c_file, "rb") as f:
                                 st.download_button(
-                                    "⬇️ Download Cover Letter (.docx) ✏️",
+                                    "⬇️ Download Cover Letter",
                                     data=f.read(),
-                                    file_name=os.path.basename(result["cover_path"]),
+                                    file_name=os.path.basename(c_file),
                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                    key=f"dl_cover_{orig_idx}",
-                                    use_container_width=True,
-                                )
-                        elif result.get("cover_path") and os.path.exists(result["cover_path"]):
-                            with open(result["cover_path"], "rb") as f:
-                                st.download_button(
-                                    "⬇️ Download Cover Letter (.docx)",
-                                    data=f.read(),
-                                    file_name=os.path.basename(result["cover_path"]),
-                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                    key=f"dl_cover_{orig_idx}",
+                                    key=f"dl_c_{orig_idx}",
                                     use_container_width=True,
                                 )
 
-                with doc_col3:
+                with d3:
                     if job.get("url"):
-                        st.markdown("**🚀 Apply Now**")
+                        st.markdown("**🚀 Apply**")
                         st.link_button(
-                            "🔗 Open Job Posting",
+                            "Open job posting ↗",
                             job["url"],
                             use_container_width=True,
                         )
+                        st.caption("Tip: download both files first, then open the posting")
 
-                # Editable tabs
-                tab_r, tab_c = st.tabs(["✏️ Edit Resume", "✏️ Edit Cover Letter"])
-
-                with tab_r:
-                    current_r = result.get("edited_resume") or result["tailored_text"]
-                    edited_r = st.text_area(
-                        "Tailored Resume",
-                        value=current_r,
-                        height=400,
-                        key=f"edit_r_{orig_idx}",
-                        label_visibility="collapsed",
-                        help="Edit directly. Click 'Save Edits' to use your changes in the download.",
-                    )
-                    col_save_r, col_reset_r = st.columns([2, 1])
-                    with col_save_r:
-                        if st.button("💾 Save Resume Edits", key=f"save_r_{orig_idx}", use_container_width=True):
-                            st.session_state.results[orig_idx]["edited_resume"] = edited_r
-                            st.success("Resume edits saved — re-download to get the updated file.")
-                    with col_reset_r:
-                        if st.button("↺ Reset to AI Version", key=f"reset_r_{orig_idx}", use_container_width=True):
+                # ── Edit tabs ──
+                et1, et2 = st.tabs(["✏️ Edit resume", "✏️ Edit cover letter"])
+                with et1:
+                    cur_r = result.get("edited_resume") or result["tailored_text"]
+                    new_r = st.text_area("", value=cur_r, height=380, key=f"er_{orig_idx}", label_visibility="collapsed")
+                    s1, s2 = st.columns([3, 1])
+                    with s1:
+                        if st.button("💾 Save edits", key=f"sr_{orig_idx}", use_container_width=True):
+                            st.session_state.results[orig_idx]["edited_resume"] = new_r
+                            st.success("Saved — re-download to get the updated file.")
+                    with s2:
+                        if st.button("↺ Reset", key=f"rr_{orig_idx}", use_container_width=True):
                             st.session_state.results[orig_idx]["edited_resume"] = None
                             st.rerun()
 
-                with tab_c:
+                with et2:
                     if result.get("cover_text"):
-                        current_c = result.get("edited_cover") or result["cover_text"]
-                        edited_c = st.text_area(
-                            "Cover Letter",
-                            value=current_c,
-                            height=350,
-                            key=f"edit_c_{orig_idx}",
-                            label_visibility="collapsed",
-                            help="Edit directly. Click 'Save Edits' to use your changes in the download.",
-                        )
-                        col_save_c, col_reset_c = st.columns([2, 1])
-                        with col_save_c:
-                            if st.button("💾 Save Cover Letter Edits", key=f"save_c_{orig_idx}", use_container_width=True):
-                                st.session_state.results[orig_idx]["edited_cover"] = edited_c
-                                st.success("Cover letter edits saved — re-download to get the updated file.")
-                        with col_reset_c:
-                            if st.button("↺ Reset to AI Version", key=f"reset_c_{orig_idx}", use_container_width=True):
+                        cur_c = result.get("edited_cover") or result["cover_text"]
+                        new_c = st.text_area("", value=cur_c, height=320, key=f"ec_{orig_idx}", label_visibility="collapsed")
+                        s3, s4 = st.columns([3, 1])
+                        with s3:
+                            if st.button("💾 Save edits", key=f"sc_{orig_idx}", use_container_width=True):
+                                st.session_state.results[orig_idx]["edited_cover"] = new_c
+                                st.success("Saved — re-download to get the updated file.")
+                        with s4:
+                            if st.button("↺ Reset", key=f"rc_{orig_idx}", use_container_width=True):
                                 st.session_state.results[orig_idx]["edited_cover"] = None
                                 st.rerun()
                     else:
-                        st.caption("No cover letter generated.")
+                        st.caption("No cover letter was generated for this job.")
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -832,96 +892,90 @@ with tab3:
 with tab4:
     st.markdown("## 📊 Application Tracker")
 
-    from utils.excel_tracker import get_all_applications, TRACKER_FILE, HEADERS
+    from utils.excel_tracker import get_all_applications, TRACKER_FILE
+    import pandas as pd
 
     applications = get_all_applications()
 
-    if applications:
-        # Stats row
-        total = len(applications)
-        statuses = [a.get("Status", "") for a in applications]
-        applied_n = statuses.count("Applied")
-        interviewing_n = statuses.count("Interviewing")
-        offers_n = statuses.count("Offer")
+    if not applications:
+        st.markdown(
+            '<div class="upload-hint">'
+            '<h3 style="margin:0 0 0.5rem">No applications tracked yet</h3>'
+            '<p style="margin:0">Process jobs in the <strong>⚡ AI Apply</strong> tab — '
+            'they\'ll appear here automatically.</p>'
+            '</div>', unsafe_allow_html=True,
+        )
+        if os.path.exists(TRACKER_FILE):
+            with open(TRACKER_FILE, "rb") as f:
+                st.download_button("⬇️ Download empty tracker template", data=f,
+                    file_name="JobPilot_Tracker.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    else:
+        total  = len(applications)
+        stats  = [a.get("Status", "") for a in applications]
+        n_app  = stats.count("Applied")
+        n_int  = stats.count("Interviewing")
+        n_off  = stats.count("Offer")
+        n_rej  = stats.count("Rejected")
 
-        c1, c2, c3, c4 = st.columns(4)
+        # Stat row
+        cs1, cs2, cs3, cs4, cs5 = st.columns(5)
         for col, label, val, color in [
-            (c1, "Total Applied", total, "#0f3460"),
-            (c2, "In Progress", interviewing_n, "#D97706"),
-            (c3, "Offers", offers_n, "#059669"),
-            (c4, "Pending Response", applied_n, "#6B7280"),
+            (cs1, "Total", total, "#6366f1"),
+            (cs2, "Applied", n_app, "#64748b"),
+            (cs3, "Interviewing", n_int, "#f59e0b"),
+            (cs4, "Offers", n_off, "#10b981"),
+            (cs5, "Rejected", n_rej, "#ef4444"),
         ]:
             with col:
                 st.markdown(
-                    f'<div class="stat-box"><div class="stat-number" style="color:{color}">{val}</div>'
+                    f'<div class="stat-box"><div class="stat-num" style="color:{color}">{val}</div>'
                     f'<div class="stat-label">{label}</div></div>',
                     unsafe_allow_html=True,
                 )
 
-        st.divider()
+        st.markdown("---")
 
-        # Filter controls
-        fc1, fc2, fc3 = st.columns([2, 2, 2])
-        with fc1:
-            filter_status = st.selectbox("Filter by Status", ["All", "Applied", "Interviewing", "Offer", "Rejected", "Withdrawn"])
-        with fc2:
-            filter_company = st.text_input("Filter by Company", "")
-        with fc3:
-            sort_by = st.selectbox("Sort by", ["Date Applied (newest)", "Match Score (highest)", "Company"])
+        # Filters
+        tf1, tf2, tf3 = st.columns([2, 2, 2])
+        with tf1:
+            f_status = st.selectbox("Status", ["All", "Applied", "Interviewing", "Offer", "Rejected", "Withdrawn"])
+        with tf2:
+            f_company = st.text_input("Filter by company", placeholder="Type to filter…")
+        with tf3:
+            f_sort = st.selectbox("Sort by", ["Date (newest)", "Match score", "Company"])
 
-        # Apply filters
         filtered = applications
-        if filter_status != "All":
-            filtered = [a for a in filtered if a.get("Status") == filter_status]
-        if filter_company:
-            filtered = [a for a in filtered if filter_company.lower() in str(a.get("Company", "")).lower()]
-
-        # Sort
-        if sort_by == "Match Score (highest)":
-            filtered.sort(key=lambda x: int(str(x.get("Match Score", "0")).rstrip("%") or 0), reverse=True)
-        elif sort_by == "Company":
-            filtered.sort(key=lambda x: str(x.get("Company", "")))
+        if f_status != "All":
+            filtered = [a for a in filtered if a.get("Status") == f_status]
+        if f_company:
+            filtered = [a for a in filtered if f_company.lower() in str(a.get("Company","")).lower()]
+        if f_sort == "Match score":
+            filtered.sort(key=lambda x: int(str(x.get("Match Score","0")).rstrip("%") or 0), reverse=True)
+        elif f_sort == "Company":
+            filtered.sort(key=lambda x: str(x.get("Company","")))
         else:
-            filtered.sort(key=lambda x: str(x.get("Date Applied", "")), reverse=True)
+            filtered.sort(key=lambda x: str(x.get("Date Applied","")), reverse=True)
 
-        st.markdown(f"**{len(filtered)}** application(s) shown")
-
-        # Table
-        import pandas as pd
+        st.caption(f"Showing {len(filtered)} of {total} applications")
         df = pd.DataFrame(filtered)
         if not df.empty:
             st.dataframe(
-                df,
-                use_container_width=True,
-                hide_index=True,
+                df, use_container_width=True, hide_index=True,
                 column_config={
                     "Job URL": st.column_config.LinkColumn("Job URL"),
                     "Match Score": st.column_config.TextColumn("Match %"),
                     "Status": st.column_config.SelectboxColumn(
-                        "Status",
-                        options=["Applied", "Interviewing", "Offer", "Rejected", "Withdrawn"],
+                        "Status", options=["Applied","Interviewing","Offer","Rejected","Withdrawn"],
                     ),
                 },
             )
 
-        # Download tracker
         if os.path.exists(TRACKER_FILE):
             with open(TRACKER_FILE, "rb") as f:
                 st.download_button(
-                    "⬇️ Download Full Excel Tracker",
-                    data=f,
-                    file_name=TRACKER_FILE,
+                    "⬇️ Download Excel tracker",
+                    data=f, file_name="JobPilot_Applications.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     type="primary",
-                )
-
-    else:
-        st.info("No applications tracked yet. Process jobs in the **🤖 AI Apply** tab to start tracking.")
-        if os.path.exists(TRACKER_FILE):
-            with open(TRACKER_FILE, "rb") as f:
-                st.download_button(
-                    "⬇️ Download Empty Tracker Template",
-                    data=f,
-                    file_name=TRACKER_FILE,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
